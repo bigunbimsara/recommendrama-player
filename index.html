@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ClyraMotion Premium Player with Subtitles</title>
+    <title>ClyraMotion Premium Player - API Edition</title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     
@@ -14,14 +14,12 @@
         .player-container { position: relative; width: 100%; height: 100vh; background: #000; overflow: hidden; }
         video { width: 100%; height: 100%; object-fit: contain; }
         
-        /* Subtitle Styling (සබ්ටයිටල් පේන පෙනුම ලස්සන කරන්න) */
         video::cue {
             background: rgba(0, 0, 0, 0.75);
             color: #fff;
             font-size: 18px;
             font-weight: 500;
             text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-            font-family: 'Inter', sans-serif;
         }
 
         .video-controls { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(13, 14, 18, 0.95)); padding: 20px; display: flex; flex-direction: column; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; z-index: 2; }
@@ -38,8 +36,6 @@
         .speed-dropdown:hover .speed-options { display: block; }
         .speed-options li { padding: 8px 12px; font-size: 13px; text-align: center; cursor: pointer; }
         .speed-options li:hover { background: rgba(0, 242, 254, 0.2); color: var(--primary-glow); }
-        
-        /* Subtitle Button Active state */
         .sub-active { color: var(--primary-glow) !important; }
 
         .spinner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 50px; height: 50px; border: 4px solid rgba(255,255,255,0.1); border-top-color: var(--primary-glow); border-radius: 50%; animation: spin 1s linear infinite; display: none; z-index: 1; }
@@ -50,8 +46,7 @@
 
 <div class="player-container" id="player">
     <div class="spinner" id="loading-spinner"></div>
-    <video id="main-video" crossorigin="anonymous">
-        </video>
+    <video id="main-video" crossorigin="anonymous"></video>
     
     <div class="video-controls">
         <div class="progress-area" id="progress-container"><div class="progress-bar" id="bar"></div></div>
@@ -64,7 +59,6 @@
             </div>
             <div class="controls-right">
                 <i class="material-icons sub-active" id="cc-btn">subtitles</i>
-
                 <div class="speed-dropdown">
                     <i class="material-icons">slow_motion_video</i>
                     <ul class="speed-options" id="speed-opts">
@@ -82,9 +76,7 @@
 </div>
 
 <script>
-    // Cloudflare Worker Proxy
-    const PROXY_URL = "https://muddy-cherry-02d2.bigunbimsara22.workers.dev/?url=";
-    
+    const PROXY_URL = "https://muddy-cherry-02d2.bigunbimsara22.workers.dev/";
     const player = document.getElementById('player');
     const video = document.getElementById('main-video');
     const playBtn = document.getElementById('play-btn');
@@ -97,32 +89,30 @@
     const speedOpts = document.querySelectorAll('#speed-opts li');
     const ccBtn = document.getElementById('cc-btn');
     
-    // URL එකෙන් වීඩියෝ සහ සබ්ටයිටල් ලින්ක්ස් ගන්නවා
     const urlParams = new URLSearchParams(window.location.search);
-    const videoSource = urlParams.get('file');
-    const subSource = urlParams.get('sub'); // ?sub=SUBTITLE_VTT_URL
+    const videoId = urlParams.get('id'); // Google Drive File ID එක ගන්නවා
+    const subSource = urlParams.get('sub'); // Subtitle URL එක ගන්නවා
     
-    // 1. වීඩියෝ එක ලෝඩ් කිරීම
-    if(videoSource) {
-        video.src = PROXY_URL + encodeURIComponent(videoSource);
+    if(videoId) {
+        // වීඩියෝ එක Worker එක හරහා Safe ව Stream කිරීම
+        video.src = `${PROXY_URL}?id=${videoId}`;
     } else {
-        alert("කරුණාකර වීඩියෝ ලින්ක් එකක් ඇතුලත් කරන්න! (?file=...)");
+        alert("කරුණාකර Google Drive Video ID එකක් ඇතුලත් කරන්න! (?id=...)");
     }
 
-    // 2. සබ්ටයිටල් එක ලෝඩ් කිරීම (CORS බ්ලොක් නොවෙන්න Cloudflare Worker එක හරහාම යවමු)
     if(subSource) {
         const track = document.createElement('track');
         track.kind = 'captions';
-        track.label = 'English / Sinhala';
-        track.srclang = 'en';
-        track.src = PROXY_URL + encodeURIComponent(subSource); // සබ් එකත් ප්‍රොක්සි කරනවා
-        track.default = true; // Auto සබ්ටයිටල් ඔන් වෙන්න
+        track.label = 'Sinhala';
+        track.srclang = 'si';
+        // සබ්ටයිටල් එක ඩිරෙක්ට් ලින්ක් එකක් වුනත් CORS Bypass වෙන්න Worker එක හරහාම යවනවා
+        track.src = `${PROXY_URL}?url=` + encodeURIComponent(subSource);
+        track.default = true;
         video.appendChild(track);
     } else {
-        ccBtn.style.display = 'none'; // සබ්ටයිටල් ලින්ක් එකක් නැත්නම් CC බටන් එක හංගනවා
+        ccBtn.style.display = 'none';
     }
 
-    // CC Button Click - Subtitle On/Off
     ccBtn.addEventListener('click', () => {
         const trackMode = video.textTracks[0];
         if (trackMode.mode === 'showing') {
@@ -134,7 +124,6 @@
         }
     });
 
-    // ප්ලේයර් එකේ සාමාන්‍ය ෆන්ක්ෂන් ටික
     function togglePlay() {
         if (video.paused) { video.play(); playBtn.innerText = 'pause'; } 
         else { video.pause(); playBtn.innerText = 'play_arrow'; }
