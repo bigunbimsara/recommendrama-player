@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClyraMotion Open Source Video Player</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { --primary-glow: #00f2fe; --secondary-glow: #4facfe; --bg-color: #0d0e12; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-color); display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; }
+        .player-container { position: relative; width: 100%; height: 100vh; background: #000; overflow: hidden; }
+        video { width: 100%; height: 100%; object-fit: contain; }
+        .video-controls { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(13, 14, 18, 0.95)); padding: 20px; display: flex; flex-direction: column; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; z-index: 2; }
+        .player-container:hover .video-controls { opacity: 1; pointer-events: auto; }
+        .progress-area { height: 6px; width: 100%; background: rgba(255,255,255,0.2); border-radius: 10px; cursor: pointer; margin-bottom: 15px; }
+        .progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--secondary-glow), var(--primary-glow)); border-radius: 10px; }
+        .control-buttons { display: flex; justify-content: space-between; align-items: center; color: #fff; }
+        .controls-left, .controls-right { display: flex; align-items: center; gap: 18px; }
+        .material-icons { cursor: pointer; font-size: 26px; transition: 0.1s; user-select: none; }
+        .material-icons:hover { color: var(--primary-glow); transform: scale(1.1); }
+        .time-display { font-size: 13px; color: rgba(255,255,255,0.8); }
+        .speed-dropdown { position: relative; display: inline-block; }
+        .speed-options { display: none; position: absolute; bottom: 35px; right: 0; background: rgba(20, 21, 26, 0.95); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; backdrop-filter: blur(10px); list-style: none; padding: 5px 0; min-width: 80px; }
+        .speed-dropdown:hover .speed-options { display: block; }
+        .speed-options li { padding: 8px 12px; font-size: 13px; text-align: center; cursor: pointer; }
+        .speed-options li:hover { background: rgba(0, 242, 254, 0.2); color: var(--primary-glow); }
+        .spinner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 50px; height: 50px; border: 4px solid rgba(255,255,255,0.1); border-top-color: var(--primary-glow); border-radius: 50%; animation: spin 1s linear infinite; display: none; z-index: 1; }
+        @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="player-container" id="player">
+    <div class="spinner" id="loading-spinner"></div>
+    <video id="main-video" crossorigin="anonymous"></video>
+    
+    <div class="video-controls">
+        <div class="progress-area" id="progress-container"><div class="progress-bar" id="bar"></div></div>
+        <div class="control-buttons">
+            <div class="controls-left">
+                <i class="material-icons" id="play-btn">play_arrow</i>
+                <i class="material-icons" id="rewind-btn">replay_10</i>
+                <i class="material-icons" id="forward-btn">forward_10</i>
+                <div class="time-display"><span id="current-time">0:00</span> / <span id="duration">0:00</span></div>
+            </div>
+            <div class="controls-right">
+                <div class="speed-dropdown">
+                    <i class="material-icons">slow_motion_video</i>
+                    <ul class="speed-options" id="speed-opts">
+                        <li data-speed="0.5">0.5x</li>
+                        <li data-speed="1" style="color:var(--primary-glow)">Normal</li>
+                        <li data-speed="1.5">1.5x</li>
+                        <li data-speed="2">2x</li>
+                    </ul>
+                </div>
+                <i class="material-icons" id="pip-btn">picture_in_picture_alt</i>
+                <i class="material-icons" id="fullscreen-btn">fullscreen</i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 100% Free Cloudflare Worker Proxy එක සම්බන්ධ කිරීම
+    const PROXY_URL = "https://muddy-cherry-02d2.bigunbimsara22.workers.dev/?url=";
+    
+    const player = document.getElementById('player');
+    const video = document.getElementById('main-video');
+    const playBtn = document.getElementById('play-btn');
+    const progressContainer = document.getElementById('progress-container');
+    const bar = document.getElementById('bar');
+    const currentTimeEl = document.getElementById('current-time');
+    const durationEl = document.getElementById('duration');
+    const fullscreenBtn = document.getElementById('fullscreen-btn');
+    const spinner = document.getElementById('loading-spinner');
+    const speedOpts = document.querySelectorAll('#speed-opts li');
+    
+    // URL එකෙන් වීඩියෝ ලින්ක් එක ගන්න එක (e.g. player.html?file=VIDEO_URL)
+    const urlParams = new URLSearchParams(window.location.search);
+    const videoSource = urlParams.get('file');
+    
+    if(videoSource) {
+        // වීඩියෝ එක අපේ worker එක හරහා ලෝඩ් කරනවා බ්ලොක් නොවී ප්ලේ වෙන්න
+        video.src = PROXY_URL + encodeURIComponent(videoSource);
+    } else {
+        alert("කරුණාකර වීඩියෝ ලින්ක් එකක් ඇතුලත් කරන්න! (?file=වීඩියෝ_ලින්ක්)");
+    }
+
+    function togglePlay() {
+        if (video.paused) { video.play(); playBtn.innerText = 'pause'; } 
+        else { video.pause(); playBtn.innerText = 'play_arrow'; }
+    }
+    playBtn.addEventListener('click', togglePlay);
+    video.addEventListener('click', togglePlay);
+    document.getElementById('forward-btn').addEventListener('click', () => video.currentTime += 10);
+    document.getElementById('rewind-btn').addEventListener('click', () => video.currentTime -= 10);
+
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+        if (e.code === 'ArrowRight') video.currentTime += 5;
+        if (e.code === 'ArrowLeft') video.currentTime -= 5;
+    });
+
+    speedOpts.forEach(opt => {
+        opt.addEventListener('click', () => {
+            video.playbackRate = parseFloat(opt.dataset.speed);
+            speedOpts.forEach(o => o.style.color = '#fff');
+            opt.style.color = 'var(--primary-glow)';
+        });
+    });
+
+    document.getElementById('pip-btn').addEventListener('click', () => video.requestPictureInPicture());
+
+    video.addEventListener('timeupdate', (e) => {
+        const { currentTime, duration } = e.target;
+        if(duration) {
+            bar.style.width = `${(currentTime / duration) * 100}%`;
+            currentTimeEl.innerText = formatTime(currentTime);
+        }
+    });
+    video.addEventListener('loadeddata', () => durationEl.innerText = formatTime(video.duration));
+    function formatTime(time) {
+        let mins = Math.floor(time / 60); let secs = Math.floor(time % 60);
+        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+    progressContainer.addEventListener('click', (e) => {
+        video.currentTime = (e.offsetX / progressContainer.clientWidth) * video.duration;
+    });
+    video.addEventListener('waiting', () => spinner.style.display = 'block');
+    video.addEventListener('playing', () => spinner.style.display = 'none');
+    fullscreenBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) { player.requestFullscreen(); fullscreenBtn.innerText = 'fullscreen_exit'; } 
+        else { document.exitFullscreen(); fullscreenBtn.innerText = 'fullscreen'; }
+    });
+</script>
+</body>
+</html>
