@@ -145,4 +145,42 @@
     document.getElementById('rewind-btn').addEventListener('click', () => video.currentTime -= 10);
 
     window.addEventListener('keydown', (e) => {
-        if (e.code === 'Space') { e.preventDefault
+        if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+        if (e.code === 'ArrowRight') video.currentTime += 5;
+        if (e.code === 'ArrowLeft') video.currentTime -= 5;
+    });
+
+    speedOpts.forEach(opt => {
+        opt.addEventListener('click', () => {
+            video.playbackRate = parseFloat(opt.dataset.speed);
+            speedOpts.forEach(o => o.style.color = '#fff');
+            opt.style.color = 'var(--primary-glow)';
+        });
+    });
+
+    document.getElementById('pip-btn').addEventListener('click', () => video.requestPictureInPicture());
+
+    video.addEventListener('timeupdate', (e) => {
+        const { currentTime, duration } = e.target;
+        if(duration) {
+            bar.style.width = `${(currentTime / duration) * 100}%`;
+            currentTimeEl.innerText = formatTime(currentTime);
+        }
+    });
+    video.addEventListener('loadeddata', () => durationEl.innerText = formatTime(video.duration));
+    function formatTime(time) {
+        let mins = Math.floor(time / 60); let secs = Math.floor(time % 60);
+        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+    progressContainer.addEventListener('click', (e) => {
+        video.currentTime = (e.offsetX / progressContainer.clientWidth) * video.duration;
+    });
+    video.addEventListener('waiting', () => spinner.style.display = 'block');
+    video.addEventListener('playing', () => spinner.style.display = 'none');
+    fullscreenBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) { player.requestFullscreen(); fullscreenBtn.innerText = 'fullscreen_exit'; } 
+        else { document.exitFullscreen(); fullscreenBtn.innerText = 'fullscreen'; }
+    });
+</script>
+</body>
+</html>
